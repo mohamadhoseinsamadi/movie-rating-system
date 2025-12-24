@@ -1,3 +1,4 @@
+# Python
 __pycache__/
 *.py[cod]
 *$py.class
@@ -21,12 +22,14 @@ wheels/
 MANIFEST
 
 # Virtual Environments
+.env
 .venv
 env/
 venv/
 ENV/
 env.bak/
 venv.bak/
+pythonenv*
 
 # IDE
 .vscode/
@@ -34,58 +37,67 @@ venv.bak/
 *.swp
 *.swo
 *~
-.DS_Store
 
 # OS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
 Thumbs.db
 
-# Environment Variables
-.env
-!.env.example
+# Database
+*.db
+*.sqlite3
 
 # Logs
 *.log
 logs/
 
-# Database
-*.db
-*.sqlite
-instance/
-
 # Coverage
 .coverage
+.coverage.*
 htmlcov/
 .pytest_cache/
+
+# Environment Variables
+.env
+!.env.example
 
 # Alembic
 alembic.ini
 
 # Poetry
 poetry.lock
-pyproject.toml
+# Note: We commit pyproject.toml but not poetry.lock for this project?
+# Actually, we should commit poetry.lock for reproducibility
+# But we can ignore the virtual environment created by Poetry
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# Temp
+tmp/
+temp/
 
 # Project Specific
-/seeds/
-/data/
-/tmp/
-/temp/
+/app/migrations/
+!/alembic/
+!/alembic/versions/
+
+# Secrets
+secrets.json
+config.json
+*.pem
+*.key
+
+# PostgreSQL (if any local data)
+/postgres_data/
 
 # Docker
 docker-compose.override.yml
 
-# Test files
+# Test files (optional)
 /test_reports/
 /coverage.xml
-
-# SQLite (if used)
-movie_rating.db
-
-# PostgreSQL data (if any)
-/postgres_data/
-
-# VS Code
-.vscode/settings.json
-.vscode/launch.json
-
-# PyCharm
-.idea/
