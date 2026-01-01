@@ -132,3 +132,51 @@ class MovieService:
         self.db.commit()
         return movie
 
+    def update_movie(self, movie_id: int, title: Optional[str] = None,
+                     director_id: Optional[int] = None, release_year: Optional[int] = None,
+                     cast: Optional[str] = None, genres: Optional[List[int]] = None) -> Movie:
+        """
+        ویرایش فیلم
+
+        Args:
+            movie_id: شناسه فیلم
+            title: عنوان جدید
+            director_id: کارگردان جدید
+            release_year: سال جدید
+            cast: بازیگران جدید
+            genres: ژانرهای جدید
+
+        Returns:
+            Movie object
+
+        Raises:
+            NotFoundError: اگر فیلم یافت نشود
+        """
+        movie = self.get_movie_by_id(movie_id)
+
+        # Update fields
+        if title is not None:
+            if not title.strip():
+                raise ValidationError("عنوان فیلم نمی‌تواند خالی باشد")
+            movie.title = title
+
+        if director_id is not None:
+            movie.director_id = director_id
+
+        if release_year is not None:
+            movie.release_year = release_year
+
+        if cast is not None:
+            movie.cast = cast
+
+        # Update genres
+        if genres is not None:
+            movie.genres.clear()
+            for genre_id in genres:
+                genre = self.db.query(Genre).filter(Genre.id == genre_id).first()
+                if genre:
+                    movie.genres.append(genre)
+
+        self.db.commit()
+        return movie
+

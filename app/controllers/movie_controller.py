@@ -166,3 +166,54 @@ async def create_movie(
             detail=f"Error: {str(e)}"
         )
 
+
+@router.put("/movies/{movie_id}", response_model=dict)
+async def update_movie(
+        movie_id: int,
+        movie_data: MovieUpdateRequest = Body(...),
+        db: Session = Depends(get_db)
+):
+    """Update a movie"""
+    try:
+        service = MovieService(db)
+
+        movie = service.update_movie(
+            movie_id=movie_id,
+            title=movie_data.title,
+            director_id=movie_data.director_id if hasattr(movie_data, 'director_id') else None,
+            release_year=movie_data.release_year,
+            cast=movie_data.cast,
+            genres=movie_data.genres
+        )
+
+        stats = service.get_movie_stats(movie.id)
+
+        return {
+            "status": "success",
+            "data": {
+                "id": movie.id,
+                "title": movie.title,
+                "release_year": movie.release_year,
+                "cast": movie.cast,
+                "genres": [g.name for g in movie.genres],
+                "average_rating": stats["average_rating"],
+                "ratings_count": stats["ratings_count"]
+            }
+        }
+
+    except NotFoundError as e:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(e)
+        )
+    except ValidationError as e:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=str(e)
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error: {str(e)}"
+        )
+
