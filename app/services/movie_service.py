@@ -92,3 +92,43 @@ class MovieService:
 
         return movie
 
+    def create_movie(self, title: str, director_id: int, release_year: int,
+                     cast: str, genres: Optional[List[int]] = None) -> Movie:
+        """
+        ایجاد فیلم جدید
+
+        Args:
+            title: عنوان فیلم
+            director_id: شناسه کارگردان
+            release_year: سال انتشار
+            cast: بازیگران
+            genres: لیست IDs ژانر
+
+        Returns:
+            Movie object
+
+        Raises:
+            ValidationError: اگر عنوان خالی باشد
+        """
+        # Validate
+        if not title or len(title.strip()) == 0:
+            raise ValidationError("عنوان فیلم نمی‌تواند خالی باشد")
+
+        # Create movie
+        movie = self.movie_repo.create(
+            title=title,
+            director_id=director_id,
+            release_year=release_year,
+            cast=cast
+        )
+
+        # Add genres if provided
+        if genres:
+            for genre_id in genres:
+                genre = self.db.query(Genre).filter(Genre.id == genre_id).first()
+                if genre:
+                    movie.genres.append(genre)
+
+        self.db.commit()
+        return movie
+
