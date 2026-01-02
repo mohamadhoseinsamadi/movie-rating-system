@@ -4,7 +4,9 @@ from sqlalchemy.orm import Session
 
 from app.db.database import get_db
 from app.services.movie_service import MovieService
+from app.services.rating_service import RatingService
 from app.schemas.request.movie_schema import MovieCreateRequest, MovieUpdateRequest
+from app.schemas.request.rating_schema import RatingCreateRequest
 from app.exceptions.custom_exceptions import NotFoundError, ValidationError
 
 router = APIRouter(prefix="/api/v1", tags=["movies"])
@@ -217,3 +219,110 @@ async def update_movie(
             detail=f"Error: {str(e)}"
         )
 
+
+@router.delete("/movies/{movie_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_movie(movie_id: int, db: Session = Depends(get_db)):
+    """Delete a movie"""
+    try:
+        service = MovieService(db)
+        service.delete_movie(movie_id)
+        return None
+
+    except NotFoundError as e:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(e)
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error: {str(e)}"
+        )
+
+
+@router.post("/movies/{movie_id}/ratings", response_model=dict, status_code=status.HTTP_201_CREATED)
+async def create_rating(
+    movie_id: int,
+    rating_data: RatingCreateRequest = Body(...),
+    db: Session = Depends(get_db)
+):
+    """Create a new rating for a movie"""
+    try:
+        # Check if movie exists
+        movie_service = MovieService(db)
+        movie_service.get_movie_by_id(movie_id)
+
+        # Create rating
+        rating_service = RatingService(db)
+        rating = rating_service.create_rating(
+            movie_id=movie_id,
+            score=rating_data.score
+        )
+
+        return {
+            "status": "success",
+            "data": {
+                "id": rating.id,
+                "movie_id": rating.movie_id,
+                "score": rating.score,
+                "created_at": rating.created_at.isoformat() if rating.created_at else None
+            }
+        }
+
+    except NotFoundError as e:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(e)
+        )
+    except ValidationError as e:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=str(e)
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error: {str(e)}"
+        )
+
+
+@router.get("/movies/{movie_id}/ratings", response_model=dict)
+async def get_movie_ratings(movie_id: int, db: Session = Depends(get_db)):
+    """Get all ratings for a movie with statistics"""
+    try:
+        # Check if movie exists
+        movie_service = MovieService(db)
+        movie_service.get_movie_by_id(movie_id)
+
+        # Get ratings and stats
+        rating_service = RatingService(db)
+        ratings = rating_service.get_movie_ratings(movie_id)
+        stats = rating_service.get_movie_rating_stats(movie_id)
+
+        return {
+            "status": "success",
+            "data": {
+                "movie_id": movie_id,
+                "average_rating": stats["average_rating"],
+                "ratings_count": stats["ratings_count"],
+                "ratings": [
+                    {
+                        "id": rating.id,
+                        "score": rating.score,
+                        "created_at": rating.created_at.isoformat() if rating.created_at else None
+                    }
+                    for rating in ratings
+                ]
+            }
+        }
+
+    except NotFoundError as e:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(e)
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error: {str(e)}"
+        )
