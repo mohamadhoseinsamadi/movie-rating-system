@@ -1,4 +1,5 @@
 ﻿from sqlalchemy import Column, Integer, ForeignKey, DateTime
+from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from app.models.base import Base
 
@@ -11,5 +12,11 @@ class Rating(Base):
     
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     
+    # Relationship
+    movie = relationship("Movie", back_populates="ratings")
+    
     def __repr__(self):
         return f'<Rating(id={self.id}, movie_id={self.movie_id}, score={self.score})>'
+
+# Alias for backward compatibility
+MovieRating = Rating
