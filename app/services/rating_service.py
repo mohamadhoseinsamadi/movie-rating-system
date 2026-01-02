@@ -70,3 +70,5 @@ class RatingService:
             "ratings_count": ratings_count or 0
         }
 
+
+
