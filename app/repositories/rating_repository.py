@@ -27,3 +27,5 @@ class RatingRepository(BaseRepository[Rating]):
             Rating.movie_id == movie_id
         ).scalar()
 
+
+
