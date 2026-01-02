@@ -1,6 +1,7 @@
 ﻿from fastapi import FastAPI
 from app.db.database import engine
 from app.models.base import Base
+from app.controllers import movie_router, director_router, genre_router
 import uvicorn
 
 app = FastAPI(
@@ -8,6 +9,11 @@ app = FastAPI(
     description="Backend API for movie management and rating system",
     version="1.0.0"
 )
+
+# Register routers
+app.include_router(movie_router)
+app.include_router(director_router)
+app.include_router(genre_router)
 
 
 @app.on_event("startup")
