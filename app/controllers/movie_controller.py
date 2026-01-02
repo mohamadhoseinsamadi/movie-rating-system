@@ -1,7 +1,7 @@
+import logging
 from typing import Optional
-from fastapi import APIRouter, Depends, Query, HTTPException, status, Body
+from fastapi import APIRouter, Depends, Query, HTTPException, status, Body, Request
 from sqlalchemy.orm import Session
-
 from app.db.database import get_db
 from app.services.movie_service import MovieService
 from app.schemas.request.movie_schema import MovieCreateRequest, MovieUpdateRequest
@@ -9,9 +9,12 @@ from app.exceptions.custom_exceptions import NotFoundError, ValidationError
 
 router = APIRouter(prefix="/api/v1", tags=["movies"])
 
+logger = logging.getLogger("movie_rating")
+
 
 @router.get("/movies", response_model=dict)
 async def get_movies(
+        request: Request,
         page: int = Query(1, ge=1),
         page_size: int = Query(10, ge=1, le=100),
         title: Optional[str] = Query(None),
@@ -29,6 +32,9 @@ async def get_movies(
     - release_year: Filter by release year (example: 2008)
     - genre: Filter by genre
     """
+
+    logger.info(f"Fetching movies list (page={page}, size={page_size}, query_params={request.query_params})")
+
     try:
         service = MovieService(db)
 
@@ -62,6 +68,8 @@ async def get_movies(
 
             items.append(item)
 
+        logger.info(f"Movies fetched successfully (count={len(items)}, total={total_items})")
+
         return {
             "status": "success",
             "data": {
@@ -73,11 +81,13 @@ async def get_movies(
         }
 
     except ValidationError as e:
+        logger.error(f"Validation Error, Failed to fetch movies: {str(e)}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail=str(e)
         )
     except Exception as e:
+        logger.error(f"Failed to fetch movies: {str(e)}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Server error: {str(e)}"
@@ -261,6 +271,7 @@ async def delete_movie(movie_id: int, db: Session = Depends(get_db)):
 
 @router.post("/movies/{movie_id}/ratings", response_model=dict, status_code=status.HTTP_201_CREATED)
 async def add_rating(
+        request: Request,
         movie_id: int,
         rating_data: dict = Body(..., example={"score": 8}),
         db: Session = Depends(get_db)
@@ -273,18 +284,23 @@ async def add_rating(
         "score": 8  (number between 1 and 10)
     }
     """
+    score = rating_data.get("score")
+
+    logger.info(f"Rating movie (movie_id={movie_id}, rating={score}, route={request.url.path})")
+
     try:
         service = MovieService(db)
 
-        score = rating_data.get("score")
-
         if score is None:
+            logger.warning(f"Invalid rating value: None (movie_id={movie_id})")
             raise ValidationError("score is required")
 
         rating = service.add_rating(
             movie_id=movie_id,
             score=int(score)
         )
+
+        logger.info(f"Rating saved successfully (movie_id={movie_id}, rating={score})")
 
         stats = service.get_movie_stats(movie_id)
 
@@ -299,16 +315,19 @@ async def add_rating(
         }
 
     except NotFoundError as e:
+        logger.warning(f"Movie not found for rating: {movie_id}")
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=str(e)
         )
     except ValidationError as e:
+        logger.warning(f"Invalid rating value: {score} (movie_id={movie_id}) - {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail=str(e)
         )
     except Exception as e:
+        logger.error(f"Failed to save rating (movie_id={movie_id}, rating={score}): {str(e)}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error: {str(e)}"
