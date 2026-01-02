@@ -3,7 +3,7 @@ from typing import Optional
 
 
 class GenreResponse(BaseModel):
-    """پاسخ ژانر"""
+    """Genre response"""
     id: int
     name: str
     description: Optional[str] = None
@@ -13,5 +13,5 @@ class GenreResponse(BaseModel):
 
 
 class GenreDetailResponse(GenreResponse):
-    """پاسخ جزئی ژانر"""
+    """Detailed genre response"""
     movies_count: int = 0

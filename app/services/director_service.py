@@ -4,21 +4,21 @@ from app.exceptions.custom_exceptions import NotFoundError, ValidationError
 
 
 class DirectorService:
-    """منطق تجاری مرتبط با کارگردان"""
+    """Business logic for directors"""
 
     def __init__(self, db: Session):
         self.repo = DirectorRepository(db)
 
     def get_all_directors(self, skip: int = 0, limit: int = 10):
-        """لیست کارگردان‌ها"""
+        """List directors"""
         return self.repo.get_all(skip, limit)
 
     def get_total_count(self) -> int:
-        """تعداد کل کارگردان‌ها"""
+        """Total number of directors"""
         return self.repo.count()
 
     def get_director(self, director_id: int):
-        """جزئیات یک کارگردان"""
+        """Get director details"""
         director = self.repo.get_by_id(director_id)
         if not director:
             raise NotFoundError(f"Director with id {director_id} not found")
@@ -26,7 +26,7 @@ class DirectorService:
 
     def create_director(self, name: str, birth_year: int = None,
                         description: str = None):
-        """ایجاد کارگردان جدید"""
+        """Create a new director"""
         # Validation
         if not name or len(name.strip()) == 0:
             raise ValidationError("Director name cannot be empty")
@@ -45,7 +45,7 @@ class DirectorService:
 
     def update_director(self, director_id: int, name: str = None,
                         birth_year: int = None, description: str = None):
-        """به‌روزرسانی کارگردان"""
+        """Update a director"""
         # Check exists
         director = self.repo.get_by_id(director_id)
         if not director:
@@ -69,7 +69,7 @@ class DirectorService:
         )
 
     def delete_director(self, director_id: int):
-        """حذف کارگردان و تمام فیلم‌های آن"""
+        """Delete director and all associated movies"""
         director = self.repo.get_by_id(director_id)
         if not director:
             raise NotFoundError(f"Director with id {director_id} not found")

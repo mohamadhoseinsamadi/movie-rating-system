@@ -3,19 +3,19 @@ from typing import Optional, List
 
 
 class DirectorMinimal(BaseModel):
-    """کارگردان خلاصه"""
+    """Minimal director information"""
     id: int
     name: str
 
 
 class GenreMinimal(BaseModel):
-    """ژانر خلاصه"""
+    """Minimal genre information"""
     id: int
     name: str
 
 
 class MovieResponse(BaseModel):
-    """پاسخ فیلم"""
+    """Movie response"""
     id: int
     title: str
     release_year: int
@@ -29,13 +29,13 @@ class MovieResponse(BaseModel):
 
 
 class MovieDetailResponse(MovieResponse):
-    """پاسخ جزئی فیلم"""
+    """Detailed movie response"""
     cast: Optional[str] = None
-    director: Optional[dict] = None  # کارگردان کامل
+    director: Optional[dict] = None
 
 
 class MoviePaginatedResponse(BaseModel):
-    """لیست صفحه‌بندی شده‌ی فیلم‌ها"""
+    """Paginated list of movies"""
     page: int
     page_size: int
     total_items: int

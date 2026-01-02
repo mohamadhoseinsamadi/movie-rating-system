@@ -6,24 +6,22 @@ from dotenv import load_dotenv
 load_dotenv()
 
 DATABASE_URL = os.getenv(
-    "DATABASE_URL", 
+    "DATABASE_URL",
     "postgresql://postgres:10203151000m@localhost:5432/movie_rating_db"
 )
 
 engine = create_engine(DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
+
 def get_db():
-    """
-    Dependency برای گرفتن session دیتابیس
-    """
     db = SessionLocal()
     try:
         yield db
     finally:
         db.close()
 
-# تابع برای تست اتصال
+
 def test_connection():
     try:
         with engine.connect() as conn:

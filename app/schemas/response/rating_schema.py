@@ -4,7 +4,7 @@ from datetime import datetime
 
 
 class RatingResponse(BaseModel):
-    """پاسخ امتیاز"""
+    """Rating response"""
     rating_id: int
     movie_id: int
     score: int

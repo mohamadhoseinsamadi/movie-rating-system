@@ -4,9 +4,7 @@ from sqlalchemy.orm import Session
 
 from app.db.database import get_db
 from app.services.movie_service import MovieService
-from app.services.rating_service import RatingService
 from app.schemas.request.movie_schema import MovieCreateRequest, MovieUpdateRequest
-from app.schemas.request.rating_schema import RatingCreateRequest
 from app.exceptions.custom_exceptions import NotFoundError, ValidationError
 
 router = APIRouter(prefix="/api/v1", tags=["movies"])
@@ -103,7 +101,9 @@ async def get_movie(movie_id: int, db: Session = Depends(get_db)):
                 "release_year": movie.release_year,
                 "director": {
                     "id": movie.director.id,
-                    "name": movie.director.name
+                    "name": movie.director.name,
+                    "birth_year": movie.director.birth_year,
+                    "description": movie.director.description
                 } if movie.director else None,
                 "genres": [genre.name for genre in movie.genres],
                 "cast": movie.cast,
@@ -149,7 +149,10 @@ async def create_movie(
                 "id": movie.id,
                 "title": movie.title,
                 "release_year": movie.release_year,
-                "director_id": movie.director_id,
+                "director": {
+                    "id": movie.director.id,
+                    "name": movie.director.name
+                } if movie.director else None,
                 "cast": movie.cast,
                 "genres": [g.name for g in movie.genres],
                 "average_rating": stats["average_rating"],
@@ -196,10 +199,15 @@ async def update_movie(
                 "id": movie.id,
                 "title": movie.title,
                 "release_year": movie.release_year,
+                "director": {
+                    "id": movie.director.id,
+                    "name": movie.director.name
+                } if movie.director else None,
                 "cast": movie.cast,
                 "genres": [g.name for g in movie.genres],
                 "average_rating": stats["average_rating"],
-                "ratings_count": stats["ratings_count"]
+                "ratings_count": stats["ratings_count"],
+                "updated_at": movie.updated_at.isoformat() if movie.updated_at else None
             }
         }
 
@@ -220,13 +228,24 @@ async def update_movie(
         )
 
 
-@router.delete("/movies/{movie_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/movies/{movie_id}", response_model=dict)
 async def delete_movie(movie_id: int, db: Session = Depends(get_db)):
     """Delete a movie"""
     try:
         service = MovieService(db)
+
+        movie = service.get_movie_by_id(movie_id)
+
         service.delete_movie(movie_id)
-        return None
+
+        return {
+            "status": "success",
+            "data": {
+                "message": f"Movie {movie_id} deleted successfully",
+                "deleted_id": movie_id,
+                "deleted_title": movie.title
+            }
+        }
 
     except NotFoundError as e:
         raise HTTPException(
@@ -241,31 +260,41 @@ async def delete_movie(movie_id: int, db: Session = Depends(get_db)):
 
 
 @router.post("/movies/{movie_id}/ratings", response_model=dict, status_code=status.HTTP_201_CREATED)
-async def create_rating(
-    movie_id: int,
-    rating_data: RatingCreateRequest = Body(...),
-    db: Session = Depends(get_db)
+async def add_rating(
+        movie_id: int,
+        rating_data: dict = Body(..., example={"score": 8}),
+        db: Session = Depends(get_db)
 ):
-    """Create a new rating for a movie"""
-    try:
-        # Check if movie exists
-        movie_service = MovieService(db)
-        movie_service.get_movie_by_id(movie_id)
+    """
+    Add a rating to a movie
 
-        # Create rating
-        rating_service = RatingService(db)
-        rating = rating_service.create_rating(
+    Body:
+    {
+        "score": 8  (number between 1 and 10)
+    }
+    """
+    try:
+        service = MovieService(db)
+
+        score = rating_data.get("score")
+
+        if score is None:
+            raise ValidationError("score is required")
+
+        rating = service.add_rating(
             movie_id=movie_id,
-            score=rating_data.score
+            score=int(score)
         )
+
+        stats = service.get_movie_stats(movie_id)
 
         return {
             "status": "success",
             "data": {
-                "id": rating.id,
+                "rating_id": rating.id,
                 "movie_id": rating.movie_id,
                 "score": rating.score,
-                "created_at": rating.created_at.isoformat() if rating.created_at else None
+                "created_at": rating.created_at.isoformat()
             }
         }
 
@@ -277,48 +306,6 @@ async def create_rating(
     except ValidationError as e:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail=str(e)
-        )
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error: {str(e)}"
-        )
-
-
-@router.get("/movies/{movie_id}/ratings", response_model=dict)
-async def get_movie_ratings(movie_id: int, db: Session = Depends(get_db)):
-    """Get all ratings for a movie with statistics"""
-    try:
-        # Check if movie exists
-        movie_service = MovieService(db)
-        movie_service.get_movie_by_id(movie_id)
-
-        # Get ratings and stats
-        rating_service = RatingService(db)
-        ratings = rating_service.get_movie_ratings(movie_id)
-        stats = rating_service.get_movie_rating_stats(movie_id)
-
-        return {
-            "status": "success",
-            "data": {
-                "movie_id": movie_id,
-                "average_rating": stats["average_rating"],
-                "ratings_count": stats["ratings_count"],
-                "ratings": [
-                    {
-                        "id": rating.id,
-                        "score": rating.score,
-                        "created_at": rating.created_at.isoformat() if rating.created_at else None
-                    }
-                    for rating in ratings
-                ]
-            }
-        }
-
-    except NotFoundError as e:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
             detail=str(e)
         )
     except Exception as e:

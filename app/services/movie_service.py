@@ -1,11 +1,11 @@
 from typing import List, Dict, Optional, Tuple
 from sqlalchemy.orm import Session
-from sqlalchemy import func
 
 from app.models.movie import Movie
-from app.models.genre import Genre
 from app.models.rating import MovieRating
 from app.repositories.movie_repository import MovieRepository
+from app.repositories.genre_repository import GenreRepository
+from app.repositories.director_repository import DirectorRepository
 from app.exceptions.custom_exceptions import (
     NotFoundError,
     ValidationError
@@ -13,11 +13,13 @@ from app.exceptions.custom_exceptions import (
 
 
 class MovieService:
-    """سرویس مدیریت فیلم‌ها"""
+    """Movie management service"""
 
     def __init__(self, db: Session):
-        """مقدار دهی اولیه"""
+        """Initialize with repositories"""
         self.movie_repo = MovieRepository(db)
+        self.genre_repo = GenreRepository(db)
+        self.director_repo = DirectorRepository(db)
         self.db = db
 
     def get_all_movies(
@@ -29,92 +31,65 @@ class MovieService:
             genre: Optional[str] = None
     ) -> Tuple[List[Movie], int]:
         """
-        دریافت تمام فیلم‌ها با فیلتر و صفحه‌بندی
-
-        Args:
-            page: شماره صفحه
-            page_size: تعداد آیتم در هر صفحه
-            title: فیلتر بر اساس عنوان
-            release_year: فیلتر بر اساس سال
-            genre: فیلتر بر اساس ژانر
-
-        Returns:
-            (لیست فیلم‌ها، تعداد کل)
+        Get all movies with filtering and pagination
         """
-        # Validate page
         if page < 1:
-            raise ValidationError(f"صفحه باید مثبت باشد، دریافت شده: {page}")
+            raise ValidationError(f"Page must be positive, received: {page}")
 
-        # Get base query
-        query = self.db.query(Movie)
-
-        # Apply filters
-        if title:
-            # جست‌وجو بر اساس عنوان (Case-insensitive)
-            query = query.filter(Movie.title.ilike(f"%{title}%"))
-
-        if release_year:
-            # فیلتر بر اساس سال (دقیق)
-            query = query.filter(Movie.release_year == release_year)
-
-        if genre:
-            # فیلتر بر اساس ژانر
-            query = query.join(Movie.genres).filter(
-                Genre.name.ilike(f"%{genre}%")
-            ).distinct()
-
-        # Get total count before pagination
-        total_items = query.count()
-
-        # Apply pagination
         skip = (page - 1) * page_size
-        movies = query.offset(skip).limit(page_size).all()
+
+        movies = self.movie_repo.search_movies(
+            skip=skip,
+            limit=page_size,
+            title=title,
+            release_year=release_year,
+            genre_name=genre
+        )
+
+        total_items = self.movie_repo.count_with_filters(
+            title=title,
+            release_year=release_year,
+            genre_name=genre
+        )
 
         return movies, total_items
 
     def get_movie_by_id(self, movie_id: int) -> Movie:
-        """
-        دریافت فیلم بر اساس ID
-
-        Args:
-            movie_id: شناسه فیلم
-
-        Returns:
-            Movie object
-
-        Raises:
-            NotFoundError: اگر فیلم یافت نشود
-        """
+        """Get movie by ID"""
         movie = self.movie_repo.get_by_id(movie_id)
-
         if not movie:
-            raise NotFoundError(f"فیلم با ID {movie_id} یافت نشد")
-
+            raise NotFoundError(f"Movie with ID {movie_id} not found")
         return movie
+
+    def _validate_director(self, director_id: int):
+        """Helper to validate director existence and ID limits"""
+        if director_id > 2147483647:
+            raise ValidationError(f"Invalid director_id: {director_id} (ID too large)")
+
+        director = self.director_repo.get_by_id(director_id)
+        if not director:
+            raise ValidationError(f"Director with id {director_id} not found")
+        return director
 
     def create_movie(self, title: str, director_id: int, release_year: int,
                      cast: str, genres: Optional[List[int]] = None) -> Movie:
-        """
-        ایجاد فیلم جدید
-
-        Args:
-            title: عنوان فیلم
-            director_id: شناسه کارگردان
-            release_year: سال انتشار
-            cast: بازیگران
-            genres: لیست IDs ژانر
-
-        Returns:
-            Movie object
-
-        Raises:
-            ValidationError: اگر عنوان خالی باشد
-        """
-        # Validate
+        """Create a new movie"""
         if not title or len(title.strip()) == 0:
-            raise ValidationError("عنوان فیلم نمی‌تواند خالی باشد")
+            raise ValidationError("Movie title cannot be empty")
 
-        # Create movie
+        self._validate_director(director_id)
+
+        valid_genres = []
+        if genres:
+            for genre_id in genres:
+                if genre_id > 2147483647:
+                    raise ValidationError(f"Invalid genre_id: {genre_id}")
+
+                genre = self.genre_repo.get_by_id(genre_id)
+                if not genre:
+                    raise ValidationError(f"Genre with id {genre_id} not found")
+                valid_genres.append(genre)
+
         movie = self.movie_repo.create(
             title=title,
             director_id=director_id,
@@ -122,96 +97,73 @@ class MovieService:
             cast=cast
         )
 
-        # Add genres if provided
-        if genres:
-            for genre_id in genres:
-                genre = self.db.query(Genre).filter(Genre.id == genre_id).first()
-                if genre:
-                    movie.genres.append(genre)
+        if valid_genres:
+            movie.genres.extend(valid_genres)
+            self.db.commit()
 
-        self.db.commit()
         return movie
 
     def update_movie(self, movie_id: int, title: Optional[str] = None,
                      director_id: Optional[int] = None, release_year: Optional[int] = None,
                      cast: Optional[str] = None, genres: Optional[List[int]] = None) -> Movie:
-        """
-        ویرایش فیلم
-
-        Args:
-            movie_id: شناسه فیلم
-            title: عنوان جدید
-            director_id: کارگردان جدید
-            release_year: سال جدید
-            cast: بازیگران جدید
-            genres: ژانرهای جدید
-
-        Returns:
-            Movie object
-
-        Raises:
-            NotFoundError: اگر فیلم یافت نشود
-        """
+        """Update a movie"""
         movie = self.get_movie_by_id(movie_id)
 
-        # Update fields
         if title is not None:
             if not title.strip():
-                raise ValidationError("عنوان فیلم نمی‌تواند خالی باشد")
+                raise ValidationError("Movie title cannot be empty")
             movie.title = title
 
         if director_id is not None:
+            self._validate_director(director_id)
             movie.director_id = director_id
 
-        if release_year is not None:
-            movie.release_year = release_year
+        if release_year is not None: movie.release_year = release_year
+        if cast is not None: movie.cast = cast
 
-        if cast is not None:
-            movie.cast = cast
-
-        # Update genres
         if genres is not None:
-            movie.genres.clear()
+            new_genres = []
             for genre_id in genres:
-                genre = self.db.query(Genre).filter(Genre.id == genre_id).first()
-                if genre:
-                    movie.genres.append(genre)
+                if genre_id > 2147483647:
+                    raise ValidationError(f"Invalid genre_id: {genre_id}")
+
+                genre = self.genre_repo.get_by_id(genre_id)
+                if not genre:
+                    raise ValidationError(f"Genre with id {genre_id} not found")
+                new_genres.append(genre)
+
+            movie.genres = new_genres
 
         self.db.commit()
+        self.db.refresh(movie)
         return movie
 
-    def get_movie_stats(self, movie_id: int) -> Dict:
-        """
-        دریافت آمار فیلم (میانگین امتیاز و تعداد امتیازها)
+    def delete_movie(self, movie_id: int) -> None:
+        """Delete a movie by ID"""
+        movie = self.movie_repo.get_by_id(movie_id)
+        if not movie:
+            raise NotFoundError(f"Movie with ID {movie_id} not found")
 
-        Args:
-            movie_id: شناسه فیلم
-
-        Returns:
-            Dict شامل average_rating و ratings_count
-        """
-        average_rating = self.movie_repo.get_average_rating(movie_id)
-        ratings_count = self.movie_repo.get_ratings_count(movie_id)
-
-        return {
-            "average_rating": round(average_rating, 1) if average_rating else None,
-            "ratings_count": ratings_count or 0
-        }
-
-    def delete_movie(self, movie_id: int) -> bool:
-        """
-        حذف فیلم
-
-        Args:
-            movie_id: شناسه فیلم
-
-        Returns:
-            True if deleted, False otherwise
-
-        Raises:
-            NotFoundError: اگر فیلم یافت نشود
-        """
-        movie = self.get_movie_by_id(movie_id)
+        self.movie_repo.delete_ratings_by_movie_id(movie_id)
         self.movie_repo.delete(movie_id)
-        return True
 
+    def add_rating(self, movie_id: int, score: int) -> MovieRating:
+        """Add a rating to a movie"""
+        self.get_movie_by_id(movie_id)
+
+        if not (1 <= score <= 10):
+            raise ValidationError(
+                f"Rating must be between 1 and 10, received: {score}"
+            )
+
+        rating = MovieRating(movie_id=movie_id, score=score)
+        self.db.add(rating)
+        self.db.commit()
+        self.db.refresh(rating)
+
+        return rating
+
+    def get_movie_stats(self, movie_id: int) -> Dict:
+        """Get movie statistics"""
+        self.get_movie_by_id(movie_id)
+        return self.movie_repo.get_movie_stats(movie_id)

@@ -1,74 +1,52 @@
-from typing import List, Dict
 from sqlalchemy.orm import Session
-
-from app.models.rating import Rating
 from app.repositories.rating_repository import RatingRepository
+from app.repositories.movie_repository import MovieRepository
 from app.exceptions.custom_exceptions import NotFoundError, ValidationError
 
 
 class RatingService:
-    """سرویس مدیریت امتیازها"""
+    """Business logic for ratings"""
 
     def __init__(self, db: Session):
-        """مقدار دهی اولیه"""
-        self.rating_repo = RatingRepository(db)
-        self.db = db
+        self.repo = RatingRepository(db)
+        self.movie_repo = MovieRepository(db)
 
-    def create_rating(self, movie_id: int, score: int) -> Rating:
-        """
-        ایجاد امتیاز جدید برای فیلم
+    def create_rating(self, movie_id: int, score: int):
+        """Create a new rating"""
+        # Check movie exists
+        movie = self.movie_repo.get_by_id(movie_id)
+        if not movie:
+            raise NotFoundError(f"Movie with id {movie_id} not found")
 
-        Args:
-            movie_id: شناسه فیلم
-            score: امتیاز (1 تا 10)
+        # Validation score
+        if not isinstance(score, int) or score < 1 or score > 10:
+            raise ValidationError("Score must be an integer between 1 and 10")
 
-        Returns:
-            Rating object
-
-        Raises:
-            ValidationError: اگر امتیاز معتبر نباشد
-        """
-        # Validate score
-        if score < 1 or score > 10:
-            raise ValidationError("امتیاز باید بین 1 تا 10 باشد")
-
-        # Create rating
-        rating = self.rating_repo.create(
+        return self.repo.create(
             movie_id=movie_id,
             score=score
         )
 
-        return rating
+    def get_movie_ratings(self, movie_id: int):
+        """All ratings for a movie"""
+        movie = self.movie_repo.get_by_id(movie_id)
+        if not movie:
+            raise NotFoundError(f"Movie with id {movie_id} not found")
 
-    def get_movie_ratings(self, movie_id: int) -> List[Rating]:
-        """
-        دریافت تمام امتیازهای یک فیلم
+        return self.repo.get_by_movie(movie_id)
 
-        Args:
-            movie_id: شناسه فیلم
+    def get_average_rating(self, movie_id: int):
+        """Average rating of a movie"""
+        movie = self.movie_repo.get_by_id(movie_id)
+        if not movie:
+            raise NotFoundError(f"Movie with id {movie_id} not found")
 
-        Returns:
-            List of Rating objects
-        """
-        return self.rating_repo.get_by_movie_id(movie_id)
+        return self.repo.get_average(movie_id)
 
-    def get_movie_rating_stats(self, movie_id: int) -> Dict:
-        """
-        دریافت آمار امتیازهای یک فیلم
+    def get_ratings_count(self, movie_id: int):
+        """Number of ratings for a movie"""
+        movie = self.movie_repo.get_by_id(movie_id)
+        if not movie:
+            raise NotFoundError(f"Movie with id {movie_id} not found")
 
-        Args:
-            movie_id: شناسه فیلم
-
-        Returns:
-            Dict شامل average_rating و ratings_count
-        """
-        average_rating = self.rating_repo.get_average_rating(movie_id)
-        ratings_count = self.rating_repo.get_ratings_count(movie_id)
-
-        return {
-            "average_rating": round(average_rating, 1) if average_rating else None,
-            "ratings_count": ratings_count or 0
-        }
-
-
-
+        return self.repo.count_by_movie(movie_id)

@@ -3,7 +3,7 @@ from typing import Optional
 
 
 class DirectorResponse(BaseModel):
-    """پاسخ کارگردان"""
+    """Director response"""
     id: int
     name: str
     birth_year: Optional[int] = None
@@ -14,5 +14,5 @@ class DirectorResponse(BaseModel):
 
 
 class DirectorDetailResponse(DirectorResponse):
-    """پاسخ جزئی کارگردان"""
+    """Detailed director response"""
     movies_count: int = 0
