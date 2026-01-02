@@ -180,3 +180,38 @@ class MovieService:
         self.db.commit()
         return movie
 
+    def get_movie_stats(self, movie_id: int) -> Dict:
+        """
+        دریافت آمار فیلم (میانگین امتیاز و تعداد امتیازها)
+
+        Args:
+            movie_id: شناسه فیلم
+
+        Returns:
+            Dict شامل average_rating و ratings_count
+        """
+        average_rating = self.movie_repo.get_average_rating(movie_id)
+        ratings_count = self.movie_repo.get_ratings_count(movie_id)
+
+        return {
+            "average_rating": round(average_rating, 1) if average_rating else None,
+            "ratings_count": ratings_count or 0
+        }
+
+    def delete_movie(self, movie_id: int) -> bool:
+        """
+        حذف فیلم
+
+        Args:
+            movie_id: شناسه فیلم
+
+        Returns:
+            True if deleted, False otherwise
+
+        Raises:
+            NotFoundError: اگر فیلم یافت نشود
+        """
+        movie = self.get_movie_by_id(movie_id)
+        self.movie_repo.delete(movie_id)
+        return True
+
