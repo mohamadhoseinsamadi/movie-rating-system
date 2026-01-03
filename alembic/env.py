@@ -3,7 +3,7 @@ from logging.config import fileConfig
 from sqlalchemy import engine_from_config
 from sqlalchemy import pool
 from alembic import context
-
+from os import environ
 # Import your Base model and all models
 from app.models.base import Base
 from app.models.movie import Movie
@@ -35,8 +35,7 @@ def run_migrations_offline() -> None:
 
     """
     configuration = config.get_section(config.config_ini_section)
-    configuration["sqlalchemy.url"] = "postgresql://postgres:10203151000m@localhost:5432/movie_rating_db"
-
+    config.set_main_option('sqlalchemy.url', environ.get('DATABASE_URL', 'postgresql://app_user:app_pass@db:5432/app_db'))
     connectable = engine_from_config(
         configuration,
         prefix="sqlalchemy.",
@@ -60,7 +59,7 @@ def run_migrations_online() -> None:
 
     """
     configuration = config.get_section(config.config_ini_section)
-    configuration["sqlalchemy.url"] = "postgresql://postgres:10203151000m@localhost:5432/movie_rating_db"
+    configuration["sqlalchemy.url"] = "postgresql://app_user:app_pass@db:5432/app_db"
 
     connectable = engine_from_config(
         configuration,
