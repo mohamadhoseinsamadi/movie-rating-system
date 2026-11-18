@@ -101,3 +101,5 @@ docker-compose.override.yml
 # Test files (optional)
 /test_reports/
 /coverage.xml
+# Large datasets (download from Kaggle, see README)
+scripts/*.csv
